@@ -1,0 +1,31 @@
+
+{
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    },
+
+    "[html]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+
+    "notebook.formatOnSave.enabled": true,
+
+    "black-formatter.args": [
+        "--line-length",
+        "88"
+    ],
+
+    "prettier.printWidth": 100,
+    "prettier.tabWidth": 4,
+
+    "editor.formatOnPaste": false,
+    "editor.formatOnType": false,
+
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic",
+
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true
+}
