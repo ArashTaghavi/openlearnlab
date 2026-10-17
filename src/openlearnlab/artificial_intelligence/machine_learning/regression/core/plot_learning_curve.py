@@ -12,17 +12,12 @@ def plot_learning_curve(
     target: str,
     dataset_name: str,
     output: Path,
+    features,
     cv: int = 5,
     random_state: int = 44,
-    features=None,
     model=None,
     train_sizes=None,
 ) -> Path:
-
-    if features is None:
-        features = df.drop(columns=[target]).columns.to_list()
-    else:
-        features = list(features)
 
     if model is None:
         model = LinearRegression()

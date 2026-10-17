@@ -20,10 +20,6 @@ def evaluate_single_feature_removal(
     output: Path,
     random_state: int,
 ) -> Path:
-    if features is None:
-        features = df.drop(columns=[target]).columns.to_list()
-    else:
-        features = list(features)
 
     if model is None:
         model = LinearRegression()

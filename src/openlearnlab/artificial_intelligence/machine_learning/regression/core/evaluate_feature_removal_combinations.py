@@ -21,8 +21,6 @@ def evaluate_feature_removal_combinations(
     output: Path,
     random_state: int,
 ) -> Path:
-    features = list(features)
-    candidates = list(candidates)
 
     cv = KFold(
         n_splits=5,

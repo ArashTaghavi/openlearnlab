@@ -17,16 +17,11 @@ def compare_regularization(
     target: str,
     dataset_name: str,
     output: Path,
-    features=None,
+    features,
     alphas=None,
     l1_ratio: float = 0.5,
     random_state: int = 44,
 ) -> Path:
-
-    if features is None:
-        features = df.drop(columns=[target]).columns.to_list()
-    else:
-        features = list(features)
 
     if alphas is None:
         alphas = [0.01, 0.1, 1, 10, 100]

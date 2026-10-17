@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 
@@ -34,17 +35,6 @@ class RegressionAnalyzer:
         self.output_dir = Path(output_dir)
         self.title = title
 
-    def _set_data(
-        self,
-        df: pd.DataFrame,
-        target: str,
-    ):
-        if target is not None and target not in df.columns:
-            raise ValueError(f"Target '{target}' not found in DataFrame.")
-
-        self.df = df.copy()
-        self.target = target
-
     def info(self) -> Path:
         return get_info(
             df=self.df,
@@ -56,11 +46,13 @@ class RegressionAnalyzer:
         self,
         features,
         threshold=0.8,
+        method: Literal["pearson", "kendall", "spearman"] = "pearson",
     ) -> Path:
         return get_correlation(
             df=self.df,
             threshold=threshold,
             features=features,
+            method=method,
             dataset_name=self.dataset_name,
             output=self.output_dir / "correlation",
         )
@@ -189,8 +181,8 @@ class RegressionAnalyzer:
     def feature_selection(
         self,
         target: str,
+        features,
         model=None,
-        features=None,
         scoring: str = "r2",
         cv: int = 5,
         random_state: int = 44,
@@ -284,6 +276,3 @@ class RegressionAnalyzer:
             dataset_name=self.dataset_name,
             output=self.output_dir / "compare_regularization",
         )
-
-    def reinit(self, df: pd.DataFrame, target: str):
-        self._set_data(df, target)

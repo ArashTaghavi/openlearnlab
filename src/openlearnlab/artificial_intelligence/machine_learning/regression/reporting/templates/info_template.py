@@ -20,7 +20,7 @@ class InfoTemplate(BaseTemplate):
     ):
         super().__init__(
             dataset_name=dataset_name,
-            title="Dataset Information (info)",
+            title="Dataset Information",
         )
 
         self.shape = shape

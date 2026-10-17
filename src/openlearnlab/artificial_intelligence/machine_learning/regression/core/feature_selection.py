@@ -23,15 +23,6 @@ def feature_selection(
     random_state: int = 44,
 ) -> Path:
 
-    # -----------------------------------
-    # Features
-    # -----------------------------------
-
-    if features is None:
-        features = df.drop(columns=[target]).columns.to_list()
-    else:
-        features = list(features)
-
     if model is None:
         model = LinearRegression()
 

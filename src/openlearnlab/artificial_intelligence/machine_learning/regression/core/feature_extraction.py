@@ -12,14 +12,9 @@ def feature_extraction(
     target: str,
     dataset_name: str,
     output: Path,
-    features=None,
+    features,
     variance_threshold: float = 0.95,
 ) -> Path:
-
-    if features is None:
-        features = df.drop(columns=[target]).columns.to_list()
-    else:
-        features = list(features)
 
     X = df[features]
 

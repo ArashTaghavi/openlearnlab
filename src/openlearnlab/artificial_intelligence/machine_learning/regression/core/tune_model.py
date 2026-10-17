@@ -16,16 +16,11 @@ def tune_model(
     param_grid: dict,
     dataset_name: str,
     output: Path,
-    features=None,
+    features,
     cv: int = 5,
     scoring=None,
     random_state: int = 44,
 ) -> Path:
-
-    if features is None:
-        features = df.drop(columns=[target]).columns.to_list()
-    else:
-        features = list(features)
 
     if scoring is None:
         scoring = {

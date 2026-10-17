@@ -18,8 +18,6 @@ def refine_and_evaluate(
     random_state: int,
 ) -> Path:
 
-    features = list(features)
-
     cv = KFold(
         n_splits=5,
         shuffle=True,

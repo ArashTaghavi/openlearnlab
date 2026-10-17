@@ -18,10 +18,6 @@ def diagnostics(
     output: Path,
     random_state: int,
 ) -> Path:
-    if len(df) < 5:
-        raise ValueError("Diagnostics requires at least 5 observations.")
-
-    features = list(features)
 
     cv = KFold(
         n_splits=5,

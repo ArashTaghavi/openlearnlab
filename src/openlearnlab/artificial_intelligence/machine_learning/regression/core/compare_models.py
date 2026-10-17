@@ -18,7 +18,6 @@ def compare_models(
     output: Path,
     random_state,
 ):
-    features = list(features)
 
     cv = KFold(
         n_splits=5,
