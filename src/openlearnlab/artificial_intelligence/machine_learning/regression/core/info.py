@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..reporting.templates.info_template import InfoTemplate
+from ..reporting.templates import InfoTemplate
 
 
 def info(

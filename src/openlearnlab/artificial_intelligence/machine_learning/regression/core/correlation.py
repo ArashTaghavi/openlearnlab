@@ -4,15 +4,15 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from ..reporting.templates.correlation_template import CorrelationTemplate
+from ..reporting.templates import CorrelationTemplate
 
 
 def correlation(
     df: pd.DataFrame,
     dataset_name: str,
     output: Path,
-    threshold: float = 0.1,
-    features: list[str] | None = None,
+    threshold: float,
+    features: list[str],
     method: Literal["pearson", "kendall", "spearman"] = "pearson",
 ) -> Path:
     if not 0 <= threshold <= 1:
@@ -20,27 +20,6 @@ def correlation(
 
     if method not in {"pearson", "spearman", "kendall"}:
         raise ValueError("Method must be pearson, spearman or kendall.")
-
-    if features is None:
-        features = df.select_dtypes(include="number").columns.to_list()
-
-    if not features:
-        raise ValueError("No numeric features found.")
-
-    if len(features) != len(set(features)):
-        raise ValueError("Duplicate feature names are not allowed.")
-
-    missing = [feature for feature in features if feature not in df.columns]
-    if missing:
-        raise ValueError(f"Features not found: {missing}")
-
-    non_numeric = [
-        feature
-        for feature in features
-        if not pd.api.types.is_numeric_dtype(df[feature])
-    ]
-    if non_numeric:
-        raise ValueError(f"Non-numeric features: {non_numeric}")
 
     # Correlation Matrix
     corr = df[features].corr(method=method)

@@ -2,12 +2,21 @@ from pathlib import Path
 
 import pandas as pd
 
-from .core.correlation import correlation as get_correlation
-from .core.info import info as get_info
+from .core import compare_models as get_compare_models
+from .core import correlation as get_correlation
+from .core import diagnostics as get_diagnostics
+from .core import info as get_info
+from .core import refine_and_evaluate as get_refine_and_evaluate
 
 
 class RegressionAnalyzer:
-    def __init__(self, df: pd.DataFrame,dataset_name:str='Unnamed Dataset',output_dir:str='reports',title:str='OpenLearnLab Report'):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        dataset_name: str = "Unnamed Dataset",
+        output_dir: str = "reports",
+        title: str = "OpenLearnLab Report",
+    ):
         self.df = df
         self.dataset_name = dataset_name
         self.output_dir = Path(output_dir)
@@ -33,11 +42,66 @@ class RegressionAnalyzer:
 
     def correlation(
         self,
+        features,
+        threshold=0.8,
     ) -> Path:
         return get_correlation(
             df=self.df,
+            threshold=threshold,
+            features=features,
             dataset_name=self.dataset_name,
             output=self.output_dir / "correlation",
+        )
+
+    def compare_models(
+        self,
+        features,
+        target: str,
+        models: dict,
+        random_state=44,
+    ) -> Path:
+        return get_compare_models(
+            df=self.df,
+            features=features,
+            target=target,
+            models=models,
+            random_state=random_state,
+            dataset_name=self.dataset_name,
+            output=self.output_dir / "compare_models",
+        )
+
+    def diagnostics(
+        self,
+        features,
+        target: str,
+        model,
+        random_state: int = 44,
+    ) -> Path:
+        return get_diagnostics(
+            df=self.df,
+            features=features,
+            target=target,
+            model=model,
+            random_state=random_state,
+            dataset_name=self.dataset_name,
+            output=self.output_dir / "diagnostics",
+        )
+
+    def refine_and_evaluate(
+        self,
+        features,
+        target: str,
+        model,
+        random_state: int = 44,
+    ) -> Path:
+        return get_refine_and_evaluate(
+            df=self.df,
+            features=features,
+            target=target,
+            model=model,
+            random_state=random_state,
+            dataset_name=self.dataset_name,
+            output=self.output_dir / "refine_and_evaluate",
         )
 
     def reinit(self, df: pd.DataFrame, target: str):
