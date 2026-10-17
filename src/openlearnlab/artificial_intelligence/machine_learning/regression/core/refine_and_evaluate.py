@@ -17,22 +17,8 @@ def refine_and_evaluate(
     output: Path,
     random_state: int,
 ) -> Path:
-    if len(df) < 12:
-        raise ValueError("Refinement requires at least 12 observations.")
 
     features = list(features)
-
-    if not features:
-        raise ValueError("At least one feature is required.")
-
-    if target in features:
-        raise ValueError("Target must not be included in features.")
-
-    if not df.index.is_unique:
-        raise ValueError("Refinement requires a unique DataFrame index.")
-
-    if not np.all(np.isfinite(df[target].to_numpy(dtype=float))):
-        raise ValueError("Refinement requires finite target values.")
 
     cv = KFold(
         n_splits=5,
@@ -54,9 +40,6 @@ def refine_and_evaluate(
         dtype=float,
     )
 
-    if not np.all(np.isfinite(oof_pred)):
-        raise ValueError("Model produced non-finite OOF predictions.")
-
     y_true = df[target].to_numpy(dtype=float)
     abs_errors = np.abs(y_true - oof_pred)
 
@@ -67,10 +50,8 @@ def refine_and_evaluate(
     high_error_mask = abs_errors > threshold
 
     refined_df = df.iloc[np.flatnonzero(~high_error_mask)].copy()
-    removed_df = df.iloc[np.flatnonzero(high_error_mask)].copy()
 
-    if len(refined_df) < 5:
-        raise ValueError("Too few observations remain after refinement.")
+    removed_df = df.iloc[np.flatnonzero(high_error_mask)].copy()
 
     # -----------------------------------
     # Evaluate Exactly Like compare_models
@@ -128,18 +109,28 @@ def refine_and_evaluate(
 
     comparison_rows = []
     scenario_results = []
-    fold_results = []
 
     for scenario in scenario_definitions:
         data = scenario["data"]
+
         folds = evaluate_dataset(data)
 
-        folds.insert(0, "Scenario", scenario["name"])
-        folds.insert(1, "Fold", np.arange(1, len(folds) + 1))
+        folds.insert(
+            0,
+            "Scenario",
+            scenario["name"],
+        )
 
-        fold_results.append(folds)
+        folds.insert(
+            1,
+            "Fold",
+            np.arange(1, len(folds) + 1),
+        )
 
-        # Out-of-fold predictions for diagnostic plots
+        # -----------------------------------
+        # Out-of-Fold Predictions for Plots
+        # -----------------------------------
+
         predictions = np.asarray(
             cross_val_predict(
                 clone(model),
@@ -157,22 +148,27 @@ def refine_and_evaluate(
         actual = data[target].to_numpy(dtype=float)
         residuals = actual - predictions
 
+        total_variance = float(np.sum((actual - np.mean(actual)) ** 2))
+
+        r2 = (
+            float(1 - np.sum(residuals**2) / total_variance)
+            if total_variance > 0
+            else float("nan")
+        )
+
+        rmse = float(np.sqrt(np.mean(residuals**2)))
+
+        mae = float(np.mean(np.abs(residuals)))
+
         comparison_rows.append(
             {
                 "Scenario": scenario["name"],
                 "Training Data": scenario["training"],
                 "Evaluation Data": scenario["evaluation"],
                 "Test Records": len(data),
-                "R²": (
-                    float(
-                        1
-                        - np.sum(residuals**2) / np.sum((actual - np.mean(actual)) ** 2)
-                    )
-                    if np.sum((actual - np.mean(actual)) ** 2) > 0
-                    else float("nan")
-                ),
-                "RMSE": float(np.sqrt(np.mean(residuals**2))),
-                "MAE": float(np.mean(np.abs(residuals))),
+                "R²": r2,
+                "RMSE": rmse,
+                "MAE": mae,
             }
         )
 
@@ -189,40 +185,23 @@ def refine_and_evaluate(
 
     comparison = pd.DataFrame(comparison_rows)
 
-    all_fold_results = pd.concat(
-        fold_results,
-        ignore_index=True,
-    )
-
     # -----------------------------------
-    # Export
+    # Export Refined Dataset Only
     # -----------------------------------
 
     output = Path(output)
-    output.mkdir(parents=True, exist_ok=True)
+    output.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     refined_df.to_csv(
-        output / "refined_train.csv",
+        output / "refined_dataset.csv",
         index=True,
-    )
-
-    removed_df.to_csv(
-        output / "removed_train_records.csv",
-        index=True,
-    )
-
-    comparison.to_csv(
-        output / "refinement_comparison.csv",
-        index=False,
-    )
-
-    all_fold_results.to_csv(
-        output / "refinement_fold_metrics.csv",
-        index=False,
     )
 
     # -----------------------------------
-    # Report
+    # Generate HTML Report
     # -----------------------------------
 
     template = RefineAndEvaluateTemplate(

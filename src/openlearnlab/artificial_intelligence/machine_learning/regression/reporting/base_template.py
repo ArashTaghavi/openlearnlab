@@ -4,15 +4,23 @@ from pathlib import Path
 
 
 class BaseTemplate:
-    def __init__(self, dataset_name: str, title: str):
+    def __init__(
+        self,
+        dataset_name: str,
+        title: str,
+        full_width: bool = False,
+    ):
         self.dataset_name = dataset_name
         self.title = title
+        self.full_width = full_width
 
     def content(self) -> str:
         raise NotImplementedError("Subclasses must implement content().")
 
     def render(self) -> str:
         generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        container_max_width = "none" if self.full_width else "1200px"
 
         return f"""
         <!DOCTYPE html>
@@ -36,7 +44,8 @@ class BaseTemplate:
                 }}
 
                 .container {{
-                    max-width: 1200px;
+                    max-width: {container_max_width};
+                    width: 100%;
                     margin: 0 auto;
                     padding: 32px 24px;
                 }}
@@ -215,11 +224,20 @@ class BaseTemplate:
         """
 
     def save(self, output: Path) -> Path:
-        output.mkdir(parents=True, exist_ok=True)
+        output = Path(output)
+
+        output.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
 
         filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".html"
+
         file_path = output / filename
 
-        file_path.write_text(self.render(), encoding="utf-8")
+        file_path.write_text(
+            self.render(),
+            encoding="utf-8",
+        )
 
         return file_path
