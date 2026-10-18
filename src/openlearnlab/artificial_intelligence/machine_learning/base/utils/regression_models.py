@@ -106,10 +106,10 @@ def regression_models(random_state: int = 42, selected_models: list[str] | None 
             verbosity=-1,
             n_jobs=-1,
         ),
-        # "CatBoost": CatBoostRegressor(
-        #     random_state=random_state,
-        #     verbose=0,
-        # ),
+        "CatBoost": CatBoostRegressor(
+            random_state=random_state,
+            verbose=0,
+        ),
     }
 
     if selected_models is not None:

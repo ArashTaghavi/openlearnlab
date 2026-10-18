@@ -1,3 +1,3 @@
-from .classification_analyzer import LinearRegressionAnalyzer
+from .classification_analyzer import ClassificationAnalyzer
 
-__all__ = ["LinearRegressionAnalyzer"]
+__all__ = ["ClassificationAnalyzer"]

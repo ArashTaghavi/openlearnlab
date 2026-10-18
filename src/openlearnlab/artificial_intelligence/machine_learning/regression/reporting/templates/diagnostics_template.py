@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..base_template import BaseTemplate
+from ....base.reporting.base_template import BaseTemplate
 
 
 class DiagnosticsTemplate(BaseTemplate):

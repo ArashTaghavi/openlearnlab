@@ -6,7 +6,7 @@ matplotlib.use("Agg")
 
 import pandas as pd
 
-from ..base_template import BaseTemplate
+from ....base.reporting.base_template import BaseTemplate
 
 
 class PermutationImportanceTemplate(BaseTemplate):

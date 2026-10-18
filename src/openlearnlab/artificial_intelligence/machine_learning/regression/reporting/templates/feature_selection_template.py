@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ..base_template import BaseTemplate
+from ....base.reporting.base_template import BaseTemplate
 
 
 class FeatureSelectionTemplate(BaseTemplate):
