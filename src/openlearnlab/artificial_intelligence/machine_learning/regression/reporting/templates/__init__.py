@@ -6,7 +6,7 @@ from .feature_sets_comparison_template import FeatureSetsComparisonTemplate
 from .learning_curve_template import LearningCurveTemplate
 from .model_comparison_template import ModelComparisonTemplate
 from .permutation_importance_template import PermutationImportanceTemplate
-from .refine_and_evaluate_template import RefineAndEvaluateTemplate
+from .refine_and_compare_template import RefineAndCompareTemplate
 from .regularization_comparison_template import RegularizationComparisonTemplate
 from .single_feature_removal_template import SingleFeatureRemovalTemplate
 from .tune_model_template import TuneModelTemplate
@@ -20,7 +20,7 @@ __all__ = [
     "LearningCurveTemplate",
     "ModelComparisonTemplate",
     "PermutationImportanceTemplate",
-    "RefineAndEvaluateTemplate",
+    "RefineAndCompareTemplate",
     "RegularizationComparisonTemplate",
     "SingleFeatureRemovalTemplate",
     "TuneModelTemplate",

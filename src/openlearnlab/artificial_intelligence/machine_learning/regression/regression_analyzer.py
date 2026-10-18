@@ -16,7 +16,7 @@ from .core import (
 from .core import evaluate_single_feature_removal as get_evaluate_single_feature_removal
 from .core import feature_extraction as get_feature_extraction
 from .core import feature_selection as get_feature_selection
-from .core import refine_and_evaluate as get_refine_and_evaluate
+from .core import refine_and_compare as get_refine_and_compare
 from .core import tune_model as get_tune_model
 
 
@@ -68,21 +68,21 @@ class RegressionAnalyzer(BaseAnalyzer):
             output=self.output_dir / "diagnostics",
         )
 
-    def refine_and_evaluate(
+    def refine_and_compare(
         self,
         features,
         target: str,
         model,
         random_state: int = RANDOM_STATE,
     ) -> Path:
-        return get_refine_and_evaluate(
+        return get_refine_and_compare(
             df=self.df,
             features=features,
             target=target,
             model=model,
             random_state=random_state,
             dataset_name=self.dataset_name,
-            output=self.output_dir / "refine_and_evaluate",
+            output=self.output_dir / "refine_and_compare",
         )
 
     def evaluate_single_feature_removal(

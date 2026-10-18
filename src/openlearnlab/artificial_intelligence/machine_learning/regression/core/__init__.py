@@ -8,7 +8,7 @@ from .evaluate_single_feature_removal import evaluate_single_feature_removal
 from .feature_extraction import feature_extraction
 from .feature_selection import feature_selection
 from .plot_learning_curve import plot_learning_curve
-from .refine_and_evaluate import refine_and_evaluate
+from .refine_and_compare import refine_and_compare
 from .tune_model import tune_model
 
 __all__ = [
@@ -22,6 +22,6 @@ __all__ = [
     "feature_extraction",
     "feature_selection",
     "plot_learning_curve",
-    "refine_and_evaluate",
+    "refine_and_compare",
     "tune_model",
 ]
