@@ -27,6 +27,7 @@ from xgboost import XGBClassifier
 def classification_models(
     random_state: int = 42,
     selected_models: list[str] | None = None,
+    ignored_models: list[str] | None = None,
 ):
     models = {
         # Baseline
@@ -107,13 +108,18 @@ def classification_models(
             verbosity=-1,
             n_jobs=-1,
         ),
-        # "CatBoost": CatBoostClassifier(
-        #     random_state=random_state,
-        #     verbose=0,
-        # ),
+        "CatBoost": CatBoostClassifier(
+            random_state=random_state,
+            verbose=0,
+        ),
     }
 
     if selected_models is not None:
         models = {name: models[name] for name in selected_models}
+
+    if ignored_models is not None:
+        models = {
+            name: model for name, model in models.items() if name not in ignored_models
+        }
 
     return models

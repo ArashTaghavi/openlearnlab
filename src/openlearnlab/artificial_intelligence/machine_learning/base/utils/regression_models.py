@@ -24,7 +24,11 @@ from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
 
 
-def regression_models(random_state: int = 42, selected_models: list[str] | None = None):
+def regression_models(
+    random_state: int = 42,
+    selected_models: list[str] | None = None,
+    ignored_models: list[str] | None = None,
+):
 
     models = {
         # Baseline
@@ -114,4 +118,10 @@ def regression_models(random_state: int = 42, selected_models: list[str] | None 
 
     if selected_models is not None:
         models = {name: models[name] for name in selected_models}
+
+    if ignored_models is not None:
+        models = {
+            name: model for name, model in models.items() if name not in ignored_models
+        }
+
     return models

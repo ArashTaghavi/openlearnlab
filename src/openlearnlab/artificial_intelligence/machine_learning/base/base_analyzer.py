@@ -3,8 +3,8 @@ from typing import Literal
 
 import pandas as pd
 
-from .correlation import correlation as get_correlation
-from .info import info as get_info
+from .core import correlation as get_correlation
+from .core import info as get_info
 
 
 class BaseAnalyzer:
