@@ -1,8 +1,5 @@
 from html import escape
 
-import matplotlib
-
-matplotlib.use("Agg")
 import pandas as pd
 
 from ....base.reporting.base_template import BaseTemplate
@@ -12,8 +9,7 @@ class CompareModelsTemplate(BaseTemplate):
     def __init__(
         self,
         dataset_name: str,
-        df: pd.DataFrame,
-        plot_data: pd.DataFrame,
+        results: pd.DataFrame,
         best_model: str,
         n_samples: int,
         n_features: int,
@@ -21,12 +17,10 @@ class CompareModelsTemplate(BaseTemplate):
     ):
         super().__init__(
             dataset_name=dataset_name,
-            title="Comparing Classification Models",
-            full_width=True,
+            title="Classification Model Comparison",
         )
 
-        self.df = df.copy()
-        self.plot_data = plot_data.copy()
+        self.results = results
         self.best_model = best_model
         self.n_samples = n_samples
         self.n_features = n_features
@@ -39,7 +33,7 @@ class CompareModelsTemplate(BaseTemplate):
 
         rows = []
 
-        for model_name, row in self.df.iterrows():
+        for model_name, row in self.results.iterrows():
             is_best = str(model_name) == self.best_model
 
             badge = (
@@ -54,7 +48,7 @@ class CompareModelsTemplate(BaseTemplate):
             )
 
             cells = "".join(
-                f"<td style='white-space:pre-line;'>" f"{escape(str(value))}</td>"
+                ('<td style="white-space:pre-line;">' f"{escape(str(value))}" "</td>")
                 for value in row
             )
 
@@ -68,7 +62,7 @@ class CompareModelsTemplate(BaseTemplate):
             )
 
         headers = "".join(
-            f"<th>{escape(str(column))}</th>" for column in self.df.columns
+            f"<th>{escape(str(column))}</th>" for column in self.results.columns
         )
 
         table_rows = "\n".join(rows)
@@ -91,8 +85,9 @@ class CompareModelsTemplate(BaseTemplate):
         # Summary
         # -----------------------------------
 
-        best_model = escape(self.best_model)
-        models_count = len(self.df)
+        best_model = escape(str(self.best_model))
+
+        models_count = len(self.results)
 
         dataset_info = f"{self.n_samples:,} rows / " f"{self.n_features} features"
 
@@ -146,33 +141,39 @@ class CompareModelsTemplate(BaseTemplate):
                 <p>
                     <strong>Ranking:</strong>
                     Models are ranked by mean Test F1
-                    (descending), then mean Test ROC AUC
-                    (descending), then mean Predict Time
-                    (ascending), and finally mean Fit Time
-                    (ascending).
+                    (descending), followed by mean Test ROC AUC
+                    (descending), mean Prediction Time
+                    (ascending), and mean Fit Time (ascending).
+                </p>
+
+                <p>
+                    <strong>Evaluation Metrics:</strong>
+                    Models are evaluated using Accuracy,
+                    Precision, Recall, F1 Score, and ROC AUC.
+                    Precision, Recall, and F1 are calculated
+                    for binary classification.
                 </p>
 
                 <p>
                     <strong>Relative Loss:</strong>
-                    Test Accuracy, Precision, Recall, F1,
-                    and ROC AUC losses are calculated
-                    relative to the top-ranked model.
-                    Negative losses indicate that a model
-                    outperforms the top-ranked model
-                    on that individual metric.
+                    Test metric losses, including ROC AUC loss,
+                    are calculated relative to the top-ranked model.
+                    Negative loss indicates an improvement.
                 </p>
 
                 <p>
                     <strong>Speed Comparison:</strong>
                     Fit and prediction speeds are compared
                     against the top-ranked model.
-                    Positive ratios indicate faster performance,
-                    while negative ratios indicate slower performance.
+                    Positive values indicate faster execution,
+                    while negative values indicate slower execution.
+                    A value of 1.00x indicates equal speed.
                 </p>
 
                 <p>
                     <strong>Cross Validation:</strong>
-                    {self.n_folds}-Fold Stratified Cross Validation.
+                    {self.n_folds}-Fold Stratified
+                    Cross Validation.
                 </p>
             </div>
         </section>

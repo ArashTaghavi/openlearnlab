@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
-    average_precision_score,
-    classification_report,
+    ConfusionMatrixDisplay,
+    auc,
     precision_recall_curve,
     roc_curve,
 )
@@ -23,74 +23,42 @@ class DiagnosticsTemplate(BaseTemplate):
     def __init__(
         self,
         dataset_name: str,
-        y_true: np.ndarray,
-        y_pred: np.ndarray,
+        model_name: str,
+        metrics: dict[str, float],
         classes: np.ndarray,
-        confusion_matrix: np.ndarray,
-        accuracy: float,
-        precision: float,
-        recall: float,
-        f1: float,
-        roc_auc: float | None,
-        log_loss: float | None,
-        brier_score: float | None,
-        error_rate: float,
-        n_errors: int,
+        confusion: np.ndarray,
+        class_report: pd.DataFrame,
+        error_records: pd.DataFrame,
+        class_error_analysis: pd.DataFrame,
+        feature_error_analysis: pd.DataFrame,
         insights: list[tuple[str, str]],
         n_samples: int,
         n_features: int,
         n_folds: int,
-        critical_errors: pd.DataFrame,
+        feature_names: list[str],
+        y_true: np.ndarray,
         probabilities: np.ndarray | None,
-        decision_scores: np.ndarray | None = None,
     ):
         super().__init__(
             dataset_name=dataset_name,
-            title="Classification Diagnostics",
-            full_width=True,
+            title=f"Classification Diagnostics -- {model_name}",
         )
-
-        self.y_true = np.asarray(y_true)
-        self.y_pred = np.asarray(y_pred)
-        self.classes = np.asarray(classes)
-        self.confusion_matrix = np.asarray(confusion_matrix)
-
-        self.accuracy = accuracy
-        self.precision = precision
-        self.recall = recall
-        self.f1 = f1
-        self.roc_auc = roc_auc
-        self.log_loss = log_loss
-        self.brier_score = brier_score
-        self.error_rate = error_rate
-        self.n_errors = n_errors
-
+        self.model_name = model_name
+        self.metrics = metrics
+        self.classes = classes
+        self.confusion = confusion
+        self.class_report = class_report
+        self.error_records = error_records
+        self.class_error_analysis = class_error_analysis
+        self.feature_error_analysis = feature_error_analysis
         self.insights = insights
         self.n_samples = n_samples
         self.n_features = n_features
         self.n_folds = n_folds
-        self.critical_errors = critical_errors.copy()
-        self.probabilities = (
-            np.asarray(probabilities, dtype=float)
-            if probabilities is not None
-            else None
-        )
-        self.decision_scores = (
-            np.asarray(decision_scores, dtype=float)
-            if decision_scores is not None
-            else None
-        )
-
-        if len(self.classes) != 2 or self.confusion_matrix.shape != (2, 2):
-            raise ValueError("DiagnosticsTemplate requires binary classification.")
-
-        for scores in (self.probabilities, self.decision_scores):
-            if scores is not None and (
-                scores.ndim != 1
-                or len(scores) != len(self.y_true)
-                or not np.all(np.isfinite(scores))
-            ):
-                raise ValueError("Prediction scores must be finite and 1-dimensional.")
+        self.feature_names = feature_names
+        self.y_true = y_true
+        self.probabilities = probabilities
+        self.full_width = True
 
     @staticmethod
     def _figure_to_base64(fig) -> str:
@@ -104,317 +72,595 @@ class DiagnosticsTemplate(BaseTemplate):
             buffer.close()
 
     @staticmethod
-    def _metric(value: float | None) -> str:
-        return f"{value:.4f}" if value is not None else "N/A"
-
-    def _binary_target(self) -> np.ndarray:
-        return (self.y_true == self.classes[1]).astype(int)
-
-    def _ranking_scores(self) -> np.ndarray | None:
-        if self.probabilities is not None:
-            return self.probabilities
-        return self.decision_scores
-
-    def _confusion_matrix_plot(self) -> str:
-        fig, ax = plt.subplots(figsize=(6, 4.5))
-        cm = self.confusion_matrix
-        image = ax.imshow(cm, interpolation="nearest", cmap="Blues")
-        fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
-
-        ax.set_xticks([0, 1], labels=self.classes.astype(str))
-        ax.set_yticks([0, 1], labels=self.classes.astype(str))
-        ax.set_xlabel("Predicted Class")
-        ax.set_ylabel("Actual Class")
-        ax.set_title("Confusion Matrix")
-
-        threshold = cm.max() / 2
-        for i in range(2):
-            for j in range(2):
-                ax.text(
-                    j,
-                    i,
-                    f"{cm[i, j]:,}",
-                    ha="center",
-                    va="center",
-                    color="white" if cm[i, j] > threshold else "black",
-                    fontsize=13,
-                    fontweight="bold",
-                )
-
-        fig.tight_layout()
-        return self._figure_to_base64(fig)
-
-    def _roc_curve_plot(self) -> str | None:
-        scores = self._ranking_scores()
-        if scores is None:
-            return None
-
-        fpr, tpr, _ = roc_curve(self._binary_target(), scores)
-        fig, ax = plt.subplots(figsize=(6, 4.5))
-        ax.plot(fpr, tpr, linewidth=2, label=f"ROC AUC = {self._metric(self.roc_auc)}")
-        ax.plot([0, 1], [0, 1], "r--", linewidth=1.3, label="Random")
-        ax.set(
-            xlabel="False Positive Rate", ylabel="True Positive Rate", title="ROC Curve"
+    def _table(
+        df: pd.DataFrame,
+        *,
+        index: bool = False,
+        empty_message: str = "No records detected.",
+    ) -> str:
+        if df.empty:
+            return f'<div class="card"><p>{escape(empty_message)}</p></div>'
+        html = df.to_html(
+            classes="data-table",
+            index=index,
+            border=0,
+            escape=True,
+            na_rep="—",
+            float_format=lambda value: f"{value:,.4f}",
         )
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1.05)
-        ax.grid(alpha=0.2)
-        ax.legend(loc="lower right")
-        fig.tight_layout()
-        return self._figure_to_base64(fig)
+        return f'<div style="overflow-x:auto;">{html}</div>'
 
-    def _precision_recall_plot(self) -> str | None:
-        scores = self._ranking_scores()
-        if scores is None:
-            return None
-
-        y_binary = self._binary_target()
-        precision, recall, _ = precision_recall_curve(y_binary, scores)
-        ap = average_precision_score(y_binary, scores)
-        prevalence = float(y_binary.mean())
-
-        fig, ax = plt.subplots(figsize=(6, 4.5))
-        ax.plot(recall, precision, linewidth=2, label=f"Average Precision = {ap:.4f}")
-        ax.axhline(
-            prevalence,
-            color="red",
-            linestyle="--",
-            linewidth=1.3,
-            label=f"Baseline = {prevalence:.4f}",
-        )
-        ax.set(xlabel="Recall", ylabel="Precision", title="Precision–Recall Curve")
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1.05)
-        ax.grid(alpha=0.2)
-        ax.legend(loc="lower left")
-        fig.tight_layout()
-        return self._figure_to_base64(fig)
-
-    def _confidence_distribution_plot(self) -> str | None:
-        if self.probabilities is None:
-            return None
-
-        confidence = np.where(
-            self.y_pred == self.classes[1],
-            self.probabilities,
-            1 - self.probabilities,
-        )
-        correct = self.y_true == self.y_pred
-        fig, ax = plt.subplots(figsize=(6, 4.5))
-        bins = np.linspace(0, 1, 21)
-        ax.hist(
-            confidence[correct],
-            bins=bins,
-            alpha=0.65,
-            label="Correct",
-            edgecolor="white",
-        )
-        ax.hist(
-            confidence[~correct],
-            bins=bins,
-            alpha=0.65,
-            label="Incorrect",
-            edgecolor="white",
-        )
-        ax.axvline(0.9, color="red", linestyle="--", label="90% Confidence")
-        ax.set(
-            xlabel="Predicted Class Confidence",
-            ylabel="Frequency",
-            title="Prediction Confidence Distribution",
-        )
-        ax.set_xlim(0, 1)
-        ax.grid(axis="y", alpha=0.2)
-        ax.legend()
-        fig.tight_layout()
-        return self._figure_to_base64(fig)
-
-    def _classification_report_section(self) -> str:
-        report = classification_report(
-            self.y_true,
-            self.y_pred,
-            labels=self.classes.tolist(),
-            output_dict=True,
-            zero_division=0,
+    @staticmethod
+    def _section(title: str, description: str, body: str) -> str:
+        return (
+            '<section class="table-section">'
+            f"<h2>{escape(title)}</h2><p>{escape(description)}</p>{body}"
+            "</section>"
         )
 
-        rows = []
-        for class_label in self.classes:
-            label = str(class_label)
-            metrics = report[label]
-            rows.append((label, metrics))
+    def _records_table(self, df: pd.DataFrame) -> str:
+        if df.empty:
+            return self._table(df, empty_message="No misclassified records detected.")
 
-        rows.extend(
+        view = df.drop(columns=["Is Error"], errors="ignore").copy()
+        view = view[
             [
-                ("Macro Avg", report["macro avg"]),
-                ("Weighted Avg", report["weighted avg"]),
+                *[
+                    column
+                    for column in (
+                        "Actual",
+                        "Predicted",
+                        "P(Actual)",
+                        "P(Predicted)",
+                        "Error Type",
+                    )
+                    if column in view.columns
+                ],
+                *[
+                    column
+                    for column in view.columns
+                    if column
+                    not in (
+                        "Actual",
+                        "Predicted",
+                        "P(Actual)",
+                        "P(Predicted)",
+                        "Error Type",
+                    )
+                ],
             ]
-        )
+        ]
+        feature_columns = [col for col in self.feature_names if col in view.columns]
+        if not feature_columns:
+            return self._table(view, index=True)
 
-        table_rows = "".join(
-            "<tr>"
-            f"<th>{escape(label)}</th>"
-            f"<td>{metrics['precision']:.4f}</td>"
-            f"<td>{metrics['recall']:.4f}</td>"
-            f"<td>{metrics['f1-score']:.4f}</td>"
-            f"<td>{int(metrics['support']):,}</td>"
-            "</tr>"
-            for label, metrics in rows
-        )
-
-        return f"""
-        <section class="table-section">
-            <h2>Classification Report</h2>
-            <div style="overflow-x:auto;">
-                <table class="data-table">
-                    <thead><tr>
-                        <th>Class / Average</th>
-                        <th>Precision</th><th>Recall</th>
-                        <th>F1 Score</th><th>Support</th>
-                    </tr></thead>
-                    <tbody>{table_rows}</tbody>
-                </table>
-            </div>
-            <p>
-                <strong>Macro Avg:</strong> Equal weight per class.
-                <strong>Weighted Avg:</strong> Weighted by class support.
-            </p>
-        </section>
-        """
-
-    def _confusion_matrix_section(self) -> str:
-        tn, fp, fn, tp = (int(value) for value in self.confusion_matrix.ravel())
-        negative_label = escape(str(self.classes[0]))
-        positive_label = escape(str(self.classes[1]))
-        fpr = fp / (fp + tn) if fp + tn else 0.0
-        fnr = fn / (fn + tp) if fn + tp else 0.0
-
-        return f"""
-        <section class="table-section">
-            <h2>Confusion Matrix Summary</h2>
-            <div style="overflow-x:auto;">
-                <table class="data-table">
-                    <thead><tr>
-                        <th>Actual / Predicted</th>
-                        <th>Predicted {negative_label}</th>
-                        <th>Predicted {positive_label}</th>
-                        <th>Total</th>
-                    </tr></thead>
-                    <tbody>
-                        <tr><th>Actual {negative_label}</th>
-                            <td>{tn:,} (TN)</td><td>{fp:,} (FP)</td>
-                            <td>{tn + fp:,}</td></tr>
-                        <tr><th>Actual {positive_label}</th>
-                            <td>{fn:,} (FN)</td><td>{tp:,} (TP)</td>
-                            <td>{fn + tp:,}</td></tr>
-                        <tr><th>Total</th>
-                            <td>{tn + fn:,}</td><td>{fp + tp:,}</td>
-                            <td>{tn + fp + fn + tp:,}</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <p>
-                <strong>TN:</strong> Correct negative;
-                <strong>FP:</strong> Incorrect positive;
-                <strong>FN:</strong> Missed positive;
-                <strong>TP:</strong> Correct positive.
-                <strong>FPR:</strong> {fpr:.2%};
-                <strong>FNR:</strong> {fnr:.2%}.
-            </p>
-        </section>
-        """
-
-    def _summary_section(self) -> str:
-        return f"""
-        <section class="table-section">
-            <h2>Classification Overview</h2>
-            <p>
-                <strong>Accuracy:</strong> {self.accuracy:.4f} &nbsp; | &nbsp;
-                <strong>F1:</strong> {self.f1:.4f} &nbsp; | &nbsp;
-                <strong>ROC AUC:</strong> {self._metric(self.roc_auc)} &nbsp; | &nbsp;
-                <strong>Errors:</strong> {self.n_errors:,}/{self.n_samples:,}
-                ({self.error_rate:.2%})
-            </p>
-            <p>
-                <strong>Log Loss:</strong> {self._metric(self.log_loss)} &nbsp; | &nbsp;
-                <strong>Brier Score:</strong> {self._metric(self.brier_score)} &nbsp; | &nbsp;
-                <strong>Features:</strong> {self.n_features:,} &nbsp; | &nbsp;
-                <strong>Evaluation:</strong> {self.n_folds}-Fold Stratified CV
-            </p>
-        </section>
-        """
-
-    def _high_error_observations(self) -> str:
-        if self.critical_errors.empty:
-            table_html = "<p>No misclassified observations were detected.</p>"
-        else:
-            display_df = self.critical_errors.copy()
-            display_df.index.name = "Row Index"
-            table_html = display_df.to_html(
-                classes="data-table",
-                index=True,
-                border=0,
-                escape=True,
-                na_rep="—",
-                float_format=lambda value: f"{value:.4f}",
+        tokens = []
+        replacements = {}
+        for position, (_, record) in enumerate(view.iterrows()):
+            token = f"FEATURE_DETAILS_TOKEN_{position}_END"
+            details = "".join(
+                f"<div><strong>{escape(str(feature))}</strong>: "
+                f"{escape(str(record[feature]))}</div>"
+                for feature in feature_columns
             )
-            table_html = f'<div style="overflow-x:auto;">{table_html}</div>'
+            replacements[token] = (
+                '<details class="record-features">'
+                "<summary>View Features</summary>"
+                f'<div class="record-features-content">{details}</div>'
+                "</details>"
+            )
+            tokens.append(token)
 
-        return f"""
-        <section class="table-section">
-            <h2>Misclassified Observations</h2>
-            <p>
-                Out-of-fold errors, sorted by predicted confidence when
-                probability estimates are available. An error does not
-                necessarily indicate an incorrect data label.
-            </p>
-            {table_html}
-        </section>
-        """
+        view = view.drop(columns=feature_columns)
+        view["Features"] = tokens
+        html = self._table(view, index=True)
+        for token, markup in replacements.items():
+            html = html.replace(token, markup)
+        return html
 
-    def _insights_section(self) -> str:
-        cards = "".join(
-            f'<div class="card"><div class="card-title">{escape(title)}</div>'
-            f"<p>{escape(description)}</p></div>"
-            for title, description in self.insights
+    def _confusion_plot(self, normalize: bool = False) -> str:
+        matrix = self.confusion.astype(float if normalize else int)
+        if normalize:
+            totals = matrix.sum(axis=1, keepdims=True)
+            matrix = np.divide(
+                matrix,
+                totals,
+                out=np.zeros_like(matrix),
+                where=totals != 0,
+            )
+
+        size = max(5.5, min(12.0, 4.5 + len(self.classes) * 0.45))
+        fig, ax = plt.subplots(figsize=(size, size * 0.85))
+        display = ConfusionMatrixDisplay(
+            confusion_matrix=matrix,
+            display_labels=[str(label) for label in self.classes],
         )
-        return f"""
-        <section class="table-section">
-            <h2>Diagnostic Insights</h2>
-            <div class="grid">{cards}</div>
-        </section>
-        """
+        display.plot(
+            ax=ax,
+            cmap="Blues",
+            colorbar=True,
+            values_format=".2f" if normalize else "d",
+            xticks_rotation=45,
+        )
+        ax.set_title("Normalized Confusion Matrix" if normalize else "Confusion Matrix")
+        fig.tight_layout()
+        return self._figure_to_base64(fig)
 
-    def _plots_section(self) -> str:
-        plots = [
-            ("Confusion Matrix", self._confusion_matrix_plot()),
-            ("ROC Curve", self._roc_curve_plot()),
-            ("Precision–Recall Curve", self._precision_recall_plot()),
+    # -----------------------------------
+    # Precision / Recall / F1 vs Threshold
+    # -----------------------------------
+
+    def _threshold_metrics_plot(self) -> str:
+        actual = (self.y_true == self.classes[1]).astype(int)
+        probabilities = self.probabilities
+
+        precision_values, recall_values, thresholds = precision_recall_curve(
+            actual,
+            probabilities,
+        )
+
+        precision_values = precision_values[:-1]
+        recall_values = recall_values[:-1]
+
+        f1_values = np.divide(
+            2 * precision_values * recall_values,
+            precision_values + recall_values,
+            out=np.zeros_like(precision_values),
+            where=(precision_values + recall_values) != 0,
+        )
+
+        fig, ax = plt.subplots(figsize=(9, 5.5))
+
+        ax.plot(
+            thresholds,
+            precision_values,
+            label="Precision",
+            color="tab:blue",
+            linewidth=2,
+        )
+        ax.plot(
+            thresholds,
+            recall_values,
+            label="Recall",
+            color="tab:orange",
+            linewidth=2,
+        )
+        ax.plot(
+            thresholds,
+            f1_values,
+            label="F1 Score",
+            color="tab:green",
+            linewidth=2,
+        )
+
+        ax.axvline(
+            0.5,
+            color="tab:red",
+            linestyle="--",
+            linewidth=1.8,
+            label="Default Threshold (0.50)",
+        )
+
+        ax.set_title("Precision, Recall and F1 vs Decision Threshold")
+        ax.set_xlabel("Decision Threshold")
+        ax.set_ylabel("Metric Score")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1.05)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best")
+
+        fig.tight_layout()
+        return self._figure_to_base64(fig)
+
+    # -----------------------------------
+    # Probability Distribution
+    # -----------------------------------
+
+    def _probability_distribution_plot(self) -> str:
+        actual = self.y_true
+        probabilities = self.probabilities
+
+        negative = actual == self.classes[0]
+        positive = actual == self.classes[1]
+
+        fig, ax = plt.subplots(figsize=(9, 5.5))
+
+        ax.scatter(
+            probabilities[negative],
+            np.zeros(negative.sum()),
+            alpha=0.5,
+            s=30,
+            color="tab:blue",
+            label=f"Actual Class {self.classes[0]} (n={negative.sum()})",
+        )
+
+        ax.scatter(
+            probabilities[positive],
+            np.ones(positive.sum()),
+            alpha=0.5,
+            s=30,
+            color="tab:orange",
+            label=f"Actual Class {self.classes[1]} (n={positive.sum()})",
+        )
+
+        ax.axvline(
+            0.5,
+            color="tab:red",
+            linestyle="--",
+            linewidth=2,
+            label="Default Threshold (0.50)",
+        )
+
+        ax.set_title("Predicted Probability Distribution")
+        ax.set_xlabel(f"Predicted Probability of Class {self.classes[1]}")
+        ax.set_ylabel("Actual Class")
+        ax.set_xlim(0, 1)
+        ax.set_yticks([0, 1])
+        ax.set_yticklabels([str(self.classes[0]), str(self.classes[1])])
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best")
+
+        fig.tight_layout()
+        return self._figure_to_base64(fig)
+
+    # -----------------------------------
+    # ROC Curve
+    # -----------------------------------
+
+    def _roc_plot(self) -> str:
+        actual = (self.y_true == self.classes[1]).astype(int)
+
+        fpr, tpr, thresholds = roc_curve(
+            actual,
+            self.probabilities,
+        )
+
+        roc_auc = auc(fpr, tpr)
+
+        predicted_default = (self.probabilities >= 0.5).astype(int)
+
+        default_fp = np.count_nonzero((predicted_default == 1) & (actual == 0))
+        default_tn = np.count_nonzero((predicted_default == 0) & (actual == 0))
+        default_tp = np.count_nonzero((predicted_default == 1) & (actual == 1))
+        default_fn = np.count_nonzero((predicted_default == 0) & (actual == 1))
+
+        default_fpr = default_fp / (default_fp + default_tn)
+        default_tpr = default_tp / (default_tp + default_fn)
+
+        fig, ax = plt.subplots(figsize=(7, 6))
+
+        ax.plot(
+            fpr,
+            tpr,
+            color="tab:blue",
+            linewidth=2,
+            label=f"ROC Curve (AUC = {roc_auc:.4f})",
+        )
+
+        ax.plot(
+            [0, 1],
+            [0, 1],
+            color="gray",
+            linestyle="--",
+            label="Random Classifier (AUC = 0.50)",
+        )
+
+        ax.scatter(
+            default_fpr,
+            default_tpr,
+            color="tab:red",
+            s=90,
+            zorder=5,
+            label="Threshold = 0.50",
+        )
+
+        ax.set_title("Receiver Operating Characteristic (ROC)")
+        ax.set_xlabel("False Positive Rate (FPR)")
+        ax.set_ylabel("True Positive Rate (TPR)")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1.05)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="lower right")
+
+        fig.tight_layout()
+        return self._figure_to_base64(fig)
+
+    # -----------------------------------
+    # Prediction Probability Scatter
+    # -----------------------------------
+
+    def _probability_scatter_plot(self) -> str:
+        actual = (self.y_true == self.classes[1]).astype(int)
+        probabilities = self.probabilities
+
+        predicted = (probabilities >= 0.5).astype(int)
+        indices = np.arange(len(probabilities))
+
+        categories = [
             (
-                "Prediction Confidence Distribution",
-                self._confidence_distribution_plot(),
+                "True Negative (TN)",
+                (actual == 0) & (predicted == 0),
+                "tab:blue",
+                "o",
+            ),
+            (
+                "True Positive (TP)",
+                (actual == 1) & (predicted == 1),
+                "tab:green",
+                "o",
+            ),
+            (
+                "False Positive (FP)",
+                (actual == 0) & (predicted == 1),
+                "tab:orange",
+                "x",
+            ),
+            (
+                "False Negative (FN)",
+                (actual == 1) & (predicted == 0),
+                "tab:red",
+                "x",
+            ),
+        ]
+
+        fig, ax = plt.subplots(figsize=(10, 5.5))
+
+        for label, mask, color, marker in categories:
+            ax.scatter(
+                indices[mask],
+                probabilities[mask],
+                color=color,
+                marker=marker,
+                s=32,
+                alpha=0.7,
+                label=f"{label} (n={int(mask.sum())})",
+            )
+
+        ax.axhline(
+            0.5,
+            color="black",
+            linestyle="--",
+            linewidth=1.8,
+            label="Decision Threshold (0.50)",
+        )
+
+        ax.axhspan(
+            0.5,
+            1.0,
+            color="tab:green",
+            alpha=0.04,
+        )
+        ax.axhspan(
+            0.0,
+            0.5,
+            color="tab:blue",
+            alpha=0.04,
+        )
+
+        ax.set_title("Prediction Probabilities and Decision Boundary")
+        ax.set_xlabel("Observation Position")
+        ax.set_ylabel(f"Predicted Probability of Class {self.classes[1]}")
+        ax.set_ylim(-0.03, 1.03)
+        ax.grid(True, alpha=0.25)
+        ax.legend(loc="best")
+
+        fig.tight_layout()
+        return self._figure_to_base64(fig)
+
+    # -----------------------------------
+    # Threshold Analysis Section
+    # -----------------------------------
+
+    def _threshold_section(self) -> str:
+        if self.probabilities is None:
+            return ""
+
+        plots = [
+            (
+                "Precision / Recall / F1 vs Threshold",
+                "Shows how precision, recall and F1 change as the decision "
+                "threshold moves from 0 to 1. The dashed line marks 0.50.",
+                self._threshold_metrics_plot(),
+            ),
+            (
+                "Probability Distribution",
+                "Each point represents an observation. The horizontal position "
+                "shows its predicted positive-class probability, while the "
+                "vertical position identifies its actual class. "
+                "The dashed line marks the default decision threshold of 0.50.",
+                self._probability_distribution_plot(),
+            ),
+            (
+                "ROC Curve",
+                "Shows the trade-off between true positive rate and false "
+                "positive rate across thresholds. AUC summarizes discrimination.",
+                self._roc_plot(),
+            ),
+            (
+                "Prediction Probability Scatter",
+                "Each point represents an observation. Points above the dashed "
+                "threshold are classified as positive; points below are negative. "
+                "Colors and markers identify TP, TN, FP and FN.",
+                self._probability_scatter_plot(),
             ),
         ]
 
         cards = "".join(
-            f'<div class="card"><div class="card-title">{escape(title)}</div>'
-            f'<img src="data:image/png;base64,{plot}" '
-            f'alt="{escape(title)}" style="width:100%;height:auto;"></div>'
-            for title, plot in plots
-            if plot is not None
+            '<div class="card">'
+            f'<div class="card-title">{escape(title)}</div>'
+            f'<img src="data:image/png;base64,{encoded}" '
+            f'alt="{escape(title)}" style="width:100%;height:auto;">'
+            f"<p>{escape(description)}</p>"
+            "</div>"
+            for title, description, encoded in plots
         )
-        return f"""
-        <section class="table-section">
-            <h2>Classification Diagnostics</h2>
-            <div class="grid">{cards}</div>
-        </section>
-        """
+
+        return self._section(
+            "Decision Threshold Analysis",
+            f"Binary classification: negative class = '{self.classes[0]}', "
+            f"positive class = '{self.classes[1]}'. "
+            "All probabilities are generated from out-of-fold predictions. "
+            "The displayed decision threshold is 0.50. "
+            "Changing the threshold changes classification decisions, "
+            "not the underlying predicted probabilities.",
+            f'<div class="grid">{cards}</div>',
+        )
+
+    def _summary_section(self) -> str:
+        items = [
+            ("Model", str(self.model_name)),
+            ("Accuracy", f"{self.metrics['Accuracy']:.4f}"),
+            ("Precision (Weighted)", f"{self.metrics['Precision']:.4f}"),
+            ("Recall (Weighted)", f"{self.metrics['Recall']:.4f}"),
+            ("F1 (Weighted)", f"{self.metrics['F1']:.4f}"),
+            ("Observations", f"{self.n_samples:,}"),
+            ("Features", str(self.n_features)),
+            ("Classes", str(len(self.classes))),
+            ("Misclassified", f"{len(self.error_records):,}"),
+            ("Evaluation", f"{self.n_folds}-Fold Stratified CV"),
+        ]
+        cards = "".join(
+            '<div class="card">'
+            f'<div class="card-title">{escape(label)}</div>'
+            f"<pre>{escape(value)}</pre></div>"
+            for label, value in items
+        )
+        return self._section(
+            "Model Performance Summary",
+            "Metrics are computed from out-of-fold predictions, "
+            "not from a separate held-out test set.",
+            f'<div class="grid">{cards}</div>',
+        )
+
+    def _plots_section(self) -> str:
+        plots = [
+            ("Confusion Matrix", self._confusion_plot()),
+            ("Normalized Confusion Matrix", self._confusion_plot(normalize=True)),
+        ]
+        cards = "".join(
+            '<div class="card">'
+            f'<div class="card-title">{escape(title)}</div>'
+            f'<img src="data:image/png;base64,{encoded}" '
+            f'alt="{escape(title)}" style="width:100%;height:auto;">'
+            "</div>"
+            for title, encoded in plots
+        )
+        return self._section(
+            "Prediction Diagnostics",
+            "Rows represent actual classes; columns represent predicted classes. "
+            "The normalized matrix divides each row by the number of actual "
+            "observations in that class.",
+            f'<div class="grid">{cards}</div>',
+        )
+
+    # -----------------------------------
+    # Confusion Matrix Breakdown
+    # -----------------------------------
+
+    def _confusion_breakdown_section(self) -> str:
+        matrix = self.confusion.astype(int)
+
+        total = int(matrix.sum())
+
+        records = []
+
+        for index, label in enumerate(self.classes):
+
+            tp = int(matrix[index, index])
+
+            fn = int(matrix[index, :].sum() - tp)
+
+            fp = int(matrix[:, index].sum() - tp)
+
+            tn = int(total - tp - fn - fp)
+
+            records.append(
+                {
+                    "Class": str(label),
+                    "True Positive (TP)": tp,
+                    "True Negative (TN)": tn,
+                    "False Positive (FP)": fp,
+                    "False Negative (FN)": fn,
+                }
+            )
+
+        breakdown = pd.DataFrame(records)
+
+        description = (
+            "Each class is evaluated independently using a One-vs-Rest approach. "
+            "TP: Correctly predicted as this class. "
+            "TN: Correctly predicted as another class. "
+            "FP: Incorrectly predicted as this class. "
+            "FN: Incorrectly predicted as another class."
+        )
+
+        return self._section(
+            "Confusion Matrix Breakdown (TP / TN / FP / FN)",
+            description,
+            self._table(breakdown),
+        )
+
+    def _class_report_section(self) -> str:
+        return self._section(
+            "Classification Report",
+            "Precision, recall, F1-score and support for each class "
+            "and aggregate summaries.",
+            self._table(self.class_report, index=True),
+        )
+
+    def _class_error_section(self) -> str:
+        return self._section(
+            "Error by Actual Class",
+            "Error rate is the proportion of actual observations of each "
+            "class that were assigned a different label.",
+            self._table(self.class_error_analysis),
+        )
+
+    def _error_records_section(self) -> str:
+        return self._section(
+            "Misclassified Records",
+            "Out-of-fold errors ordered by predicted-class probability (highest first). "
+            "P(Actual) is the probability assigned to the true class; "
+            "P(Predicted) is the probability assigned to the incorrect predicted class. "
+            "Expand Features to inspect original values. Do not automatically remove records.",
+            self._records_table(self.error_records),
+        )
+
+    def _feature_error_section(self) -> str:
+        return self._section(
+            "Error by Numeric Feature",
+            "Pearson correlation between a numeric feature and the binary "
+            "misclassification indicator (0 = correct, 1 = incorrect). "
+            "This does not establish causality.",
+            self._table(
+                self.feature_error_analysis,
+                empty_message="No numeric features with sufficient variation for analysis.",
+            ),
+        )
+
+    def _insights_section(self) -> str:
+        cards = "".join(
+            '<div class="card">'
+            f'<div class="card-title">{escape(title)}</div>'
+            f"<p>{escape(description)}</p>"
+            "</div>"
+            for title, description in self.insights
+        )
+        return self._section(
+            "Diagnostic Insights",
+            "Descriptive signals for investigation, not proof of a model defect.",
+            f'<div class="grid">{cards}</div>',
+        )
 
     def content(self) -> str:
-        return f"""
-        {self._summary_section()}
-        {self._classification_report_section()}
-        {self._confusion_matrix_section()}
-        {self._plots_section()}
-        {self._high_error_observations()}
-        {self._insights_section()}
-        """
+        return (
+            f"{self._summary_section()}\n"
+            f"{self._plots_section()}\n"
+            f"{self._threshold_section()}\n"
+            f"{self._confusion_breakdown_section()}\n"
+            f"{self._class_report_section()}\n"
+            f"{self._class_error_section()}\n"
+            f"{self._error_records_section()}\n"
+            f"{self._feature_error_section()}\n"
+            f"{self._insights_section()}"
+        )

@@ -5,13 +5,11 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.metrics import (
     accuracy_score,
-    brier_score_loss,
+    classification_report,
     confusion_matrix,
     f1_score,
-    log_loss,
     precision_score,
     recall_score,
-    roc_auc_score,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 
@@ -23,56 +21,50 @@ def diagnostics(
     features,
     target: str,
     model,
+    model_name,
     dataset_name: str,
     output: Path,
     random_state: int,
 ) -> Path:
-
     features = list(features)
 
+    X = df[features]
+    y = df[target]
+    if y.isna().any():
+        raise ValueError("Target contains missing values.")
+
+    counts = y.value_counts(dropna=False)
+    if len(counts) < 2:
+        raise ValueError("Classification requires at least two classes.")
+
+    n_splits = 5
+    if counts.min() < n_splits:
+        raise ValueError(
+            f"Each class must have at least {n_splits} samples "
+            "for 5-fold stratified cross-validation."
+        )
+
     cv = StratifiedKFold(
-        n_splits=5,
+        n_splits=n_splits,
         shuffle=True,
         random_state=random_state,
     )
 
-    X = df[features]
-    y = df[target]
-
-    classes = np.unique(y)
-
-    if len(classes) != 2:
-        raise ValueError(
-            "Classification diagnostics currently supports binary classification."
-        )
-
     # -----------------------------------
     # Out-of-Fold Predictions
     # -----------------------------------
-
-    y_pred = cross_val_predict(
-        clone(model),
-        X,
-        y,
-        cv=cv,
-        method="predict",
-    )
-
+    y_pred = cross_val_predict(clone(model), X, y, cv=cv, method="predict")
     y_true = y.to_numpy()
-    y_pred = np.asarray(y_pred)
-
-    negative_class, positive_class = classes
-
-    y_true_binary = (y_true == positive_class).astype(int)
+    classes = np.unique(y_true)
+    incorrect = y_true != y_pred
 
     # -----------------------------------
-    # Prediction Scores
+    # Out-of-Fold Probabilities
+    # Binary Classification
     # -----------------------------------
-
     probabilities = None
-    decision_scores = None
 
-    if hasattr(model, "predict_proba"):
+    if len(classes) == 2:
         probabilities = cross_val_predict(
             clone(model),
             X,
@@ -81,249 +73,180 @@ def diagnostics(
             method="predict_proba",
         )[:, 1]
 
-    elif hasattr(model, "decision_function"):
-        decision_scores = cross_val_predict(
-            clone(model),
-            X,
-            y,
-            cv=cv,
-            method="decision_function",
-        )
-
     # -----------------------------------
-    # Classification Errors
+    # Classification Metrics
     # -----------------------------------
+    metrics = {
+        "Accuracy": float(accuracy_score(y_true, y_pred)),
+        "Precision": float(
+            precision_score(y_true, y_pred, average="weighted", zero_division=0)
+        ),
+        "Recall": float(
+            recall_score(y_true, y_pred, average="weighted", zero_division=0)
+        ),
+        "F1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
+    }
 
-    error_mask = y_true != y_pred
-
-    error_positions = np.flatnonzero(error_mask)
-
-    n_errors = int(error_mask.sum())
-    error_rate = float(error_mask.mean())
-
-    # -----------------------------------
-    # Overall Metrics
-    # -----------------------------------
-
-    accuracy = float(accuracy_score(y_true, y_pred))
-
-    precision = float(
-        precision_score(
+    matrix = confusion_matrix(y_true, y_pred, labels=classes)
+    class_report = pd.DataFrame(
+        classification_report(
             y_true,
             y_pred,
-            pos_label=positive_class,
+            labels=classes,
+            output_dict=True,
             zero_division=0,
         )
-    )
+    ).T
+    class_report.index.name = "Class / Summary"
 
-    recall = float(
-        recall_score(
-            y_true,
-            y_pred,
-            pos_label=positive_class,
-            zero_division=0,
-        )
-    )
+    # -----------------------------------
+    # Prediction Records
+    # -----------------------------------
+    records = X.copy()
+    records["Actual"] = y_true
+    records["Predicted"] = y_pred
+    records["Is Error"] = incorrect
 
-    f1 = float(
-        f1_score(
-            y_true,
-            y_pred,
-            pos_label=positive_class,
-            zero_division=0,
-        )
-    )
-
-    cm = confusion_matrix(
-        y_true,
-        y_pred,
-        labels=classes,
-    )
-
-    tn, fp, fn, tp = cm.ravel()
-
-    roc_auc = None
-    logloss = None
-    brier = None
+    error_records = records.loc[incorrect].copy()
 
     if probabilities is not None:
-        roc_auc = float(roc_auc_score(y_true_binary, probabilities))
-
-        logloss = float(
-            log_loss(
-                y_true_binary,
-                probabilities,
-                labels=[0, 1],
-            )
+        error_probabilities = probabilities[incorrect]
+        error_records["P(Actual)"] = np.where(
+            y_true[incorrect] == classes[1],
+            error_probabilities,
+            1 - error_probabilities,
         )
-
-        brier = float(
-            brier_score_loss(
-                y_true_binary,
-                probabilities,
-            )
+        error_records["P(Predicted)"] = np.where(
+            y_pred[incorrect] == classes[1],
+            error_probabilities,
+            1 - error_probabilities,
         )
-
-    elif decision_scores is not None:
-        roc_auc = float(
-            roc_auc_score(
-                y_true_binary,
-                decision_scores,
-            )
+        error_records["Error Type"] = np.where(
+            y_true[incorrect] == classes[1], "FN", "FP"
         )
+        error_records = error_records.sort_values(
+            "P(Predicted)", ascending=False, kind="stable"
+        )
+    else:
+        error_records["P(Actual)"] = np.nan
+        error_records["P(Predicted)"] = np.nan
+        error_records["Error Type"] = "Misclassified"
 
     # -----------------------------------
-    # Error Records
+    # Per-Class Error Analysis
     # -----------------------------------
+    class_rows = []
+    for label in classes:
+        mask = y_true == label
+        count = int(mask.sum())
+        errors = int(np.count_nonzero(incorrect & mask))
+        class_rows.append(
+            {
+                "Class": str(label),
+                "Samples": count,
+                "Correct": count - errors,
+                "Errors": errors,
+                "Error Rate (%)": 100 * errors / count,
+            }
+        )
 
-    error_records = df[features].copy()
-
-    error_records["Actual"] = y_true
-    error_records["Predicted"] = y_pred
-
-    error_records["Error"] = error_mask
-
-    error_records["Error Type"] = np.select(
-        [
-            (y_true == negative_class) & (y_pred == positive_class),
-            (y_true == positive_class) & (y_pred == negative_class),
-        ],
-        [
-            "False Positive",
-            "False Negative",
-        ],
-        default="Correct",
+    class_error_analysis = pd.DataFrame(class_rows).sort_values(
+        ["Error Rate (%)", "Errors"],
+        ascending=[False, False],
+        kind="stable",
     )
 
-    if probabilities is not None:
-        error_records["Positive Probability"] = probabilities
-
-        error_records["Predicted Confidence"] = np.where(
-            y_pred == positive_class,
-            probabilities,
-            1 - probabilities,
+    # -----------------------------------
+    # Error Association with Numeric Features
+    # -----------------------------------
+    feature_rows = []
+    error_values = incorrect.astype(float)
+    for feature in X.select_dtypes(include=[np.number]).columns:
+        values = pd.to_numeric(X[feature], errors="coerce").to_numpy(dtype=float)
+        valid = np.isfinite(values)
+        if (
+            valid.sum() < 3
+            or np.std(values[valid]) == 0
+            or np.std(error_values[valid]) == 0
+        ):
+            continue
+        correlation = float(np.corrcoef(values[valid], error_values[valid])[0, 1])
+        if not np.isfinite(correlation):
+            continue
+        feature_rows.append(
+            {
+                "Feature": str(feature),
+                "Error Correlation": correlation,
+                "Absolute Correlation": abs(correlation),
+            }
         )
 
-    # -----------------------------------
-    # Critical Errors
-    # -----------------------------------
-
-    critical_errors = error_records.iloc[error_positions].copy()
-
-    if probabilities is not None:
-        critical_errors = critical_errors.sort_values(
-            "Predicted Confidence",
-            ascending=False,
-            kind="stable",
-        )
+    feature_error_analysis = pd.DataFrame(
+        feature_rows,
+        columns=["Feature", "Error Correlation", "Absolute Correlation"],
+    ).sort_values("Absolute Correlation", ascending=False, kind="stable")
 
     # -----------------------------------
     # Diagnostic Insights
     # -----------------------------------
-
-    insights: list[tuple[str, str]] = []
-
-    if fn > fp:
+    error_count = int(incorrect.sum())
+    insights = []
+    if error_count == 0:
         insights.append(
             (
-                "False Negative Dominance",
-                (
-                    "The model produces more false negatives "
-                    "than false positives. Consider examining "
-                    "positive-class recall."
-                ),
+                "No Out-of-Fold Classification Errors",
+                "All out-of-fold predictions were correct. "
+                "Validate on independent data before drawing conclusions.",
+            )
+        )
+    else:
+        insights.append(
+            (
+                "Misclassified Observations",
+                f"{error_count:,} of {len(df):,} observations "
+                f"({100 * error_count / len(df):.2f}%) were misclassified.",
+            )
+        )
+        worst = class_error_analysis.iloc[0]
+        insights.append(
+            (
+                "Most Difficult Actual Class",
+                f"Class '{worst['Class']}' has the highest error rate "
+                f"({worst['Error Rate (%)']:.2f}%) among its actual observations.",
             )
         )
 
-    elif fp > fn:
-        insights.append(
-            (
-                "False Positive Dominance",
-                (
-                    "The model produces more false positives "
-                    "than false negatives. Consider examining "
-                    "positive-class precision."
-                ),
-            )
-        )
-
-    if recall < 0.5:
-        insights.append(
-            (
-                "Low Positive Recall",
-                (
-                    "The model fails to identify more than half "
-                    "of the positive samples."
-                ),
-            )
-        )
-
-    if precision < 0.5:
-        insights.append(
-            (
-                "Low Positive Precision",
-                (
-                    "Fewer than half of the predicted positive "
-                    "samples are actually positive."
-                ),
-            )
-        )
-
-    if probabilities is not None and n_errors > 0:
-        error_confidence = critical_errors["Predicted Confidence"]
-
-        high_confidence_errors = int((error_confidence >= 0.9).sum())
-
-        if high_confidence_errors > 0:
+    if not feature_error_analysis.empty:
+        strongest = feature_error_analysis.iloc[0]
+        if strongest["Absolute Correlation"] >= 0.3:
             insights.append(
                 (
-                    "High-Confidence Misclassifications",
-                    (
-                        f"{high_confidence_errors} incorrect predictions "
-                        "were made with at least 90% predicted confidence. "
-                        "Inspect these observations for systematic errors."
-                    ),
+                    "Feature-Associated Errors",
+                    f"Feature '{strongest['Feature']}' has a correlation "
+                    f"of {strongest['Error Correlation']:.2f} with the error indicator. "
+                    "This is descriptive, not evidence of causation.",
                 )
             )
 
-    if not insights:
-        insights.append(
-            (
-                "No Strong Diagnostic Signals",
-                (
-                    "The selected checks did not identify strong "
-                    "classification error patterns. This does not "
-                    "guarantee that the model is free of problems."
-                ),
-            )
-        )
-
     # -----------------------------------
-    # Generate Diagnostics Report
+    # HTML Report
     # -----------------------------------
-
     template = DiagnosticsTemplate(
         dataset_name=dataset_name,
-        y_true=y_true,
-        y_pred=y_pred,
+        model_name=str(model_name),
+        metrics=metrics,
         classes=classes,
-        confusion_matrix=cm,
-        accuracy=accuracy,
-        precision=precision,
-        recall=recall,
-        f1=f1,
-        roc_auc=roc_auc,
-        log_loss=logloss,
-        brier_score=brier,
-        error_rate=error_rate,
-        n_errors=n_errors,
+        confusion=matrix,
+        class_report=class_report,
+        error_records=error_records,
+        class_error_analysis=class_error_analysis,
+        feature_error_analysis=feature_error_analysis,
         insights=insights,
         n_samples=len(df),
         n_features=len(features),
         n_folds=cv.get_n_splits(),
-        critical_errors=critical_errors,
+        feature_names=features,
+        y_true=y_true,
         probabilities=probabilities,
-        decision_scores=decision_scores,
     )
-
-    return template.save(output=output)
+    return template.save(output=output, suffix_file_name=str(model_name))

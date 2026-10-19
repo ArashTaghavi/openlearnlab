@@ -12,7 +12,7 @@ class BaseTemplate:
     ):
         self.dataset_name = dataset_name
         self.title = title
-        self.full_width = full_width
+        self.full_width = True
 
     def content(self) -> str:
         raise NotImplementedError("Subclasses must implement content().")

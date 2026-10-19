@@ -181,6 +181,7 @@ def compare_models(
     best_test_recall = float(result.iloc[0]["_Test Recall Mean"])
     best_test_f1 = float(result.iloc[0]["_Test F1 Mean"])
     best_test_roc_auc = float(result.iloc[0]["_Test ROC AUC Mean"])
+
     best_fit_time = float(result.iloc[0]["_Fit Time Mean"])
     best_predict_time = float(result.iloc[0]["_Predict Time Mean"])
 
@@ -341,9 +342,6 @@ def compare_models(
         ]
     ]
 
-    # Plot data
-    plot_data = result[["_Fit Time Mean", "_Predict Time Mean"]].copy()
-
     # Remove internal columns
     result = result.drop(
         columns=[
@@ -361,13 +359,10 @@ def compare_models(
 
     template = CompareModelsTemplate(
         dataset_name=dataset_name,
-        df=result,
-        plot_data=plot_data,
+        results=result,
         best_model=best_model,
         n_samples=len(df),
         n_features=len(features),
         n_folds=cv.get_n_splits(),
-
     )
-
     return template.save(output=output)
