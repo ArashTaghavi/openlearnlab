@@ -14,6 +14,7 @@ def diagnostics(
     features,
     target: str,
     model,
+    model_name,
     dataset_name: str,
     output: Path,
     random_state: int,
@@ -258,5 +259,6 @@ def diagnostics(
         high_error_mse_share=high_error_mse_share,
         outlier_mae_share=outlier_mae_share,
         outlier_mse_share=outlier_mse_share,
+        model_name=model_name,
     )
-    return template.save(output=output)
+    return template.save(output=output, suffix_file_name=model_name)

@@ -223,7 +223,7 @@ class BaseTemplate:
         </html>
         """
 
-    def save(self, output: Path) -> Path:
+    def save(self, output: Path, suffix_file_name="") -> Path:
         output = Path(output)
 
         output.mkdir(
@@ -231,7 +231,10 @@ class BaseTemplate:
             exist_ok=True,
         )
 
-        filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".html"
+        filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        if suffix_file_name:
+            filename += f"-{suffix_file_name}"
+        filename += ".html"
 
         file_path = output / filename
 

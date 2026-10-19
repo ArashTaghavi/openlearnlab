@@ -13,7 +13,7 @@ def feature_extraction(
     dataset_name: str,
     output: Path,
     features,
-    variance_threshold: float = 0.95,
+    variance_threshold: float,
 ) -> Path:
 
     X = df[features]

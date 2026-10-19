@@ -1,4 +1,6 @@
+from .compare_diagnostics_template import CompareDiagnosticsTemplate
 from .diagnostics_template import DiagnosticsTemplate
+from .feature_extraction_comparison_template import FeatureExtractionComparisonTemplate
 from .feature_extraction_template import FeatureExtractionTemplate
 from .feature_removal_combinations_template import FeatureRemovalCombinationsTemplate
 from .feature_selection_template import FeatureSelectionTemplate
@@ -12,7 +14,9 @@ from .single_feature_removal_template import SingleFeatureRemovalTemplate
 from .tune_model_template import TuneModelTemplate
 
 __all__ = [
+    "CompareDiagnosticsTemplate",
     "DiagnosticsTemplate",
+    "FeatureExtractionComparisonTemplate",
     "FeatureExtractionTemplate",
     "FeatureRemovalCombinationsTemplate",
     "FeatureSelectionTemplate",

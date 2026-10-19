@@ -41,8 +41,11 @@ class DiagnosticsTemplate(BaseTemplate):
         high_error_mse_share: float,
         outlier_mae_share: float,
         outlier_mse_share: float,
+        model_name: str,
     ):
-        super().__init__(dataset_name=dataset_name, title="Regression Diagnostics")
+        super().__init__(
+            dataset_name=dataset_name, title=f"Regression Diagnostics -- {model_name}"
+        )
 
         self.y_true = np.asarray(y_true, dtype=float)
         self.y_pred = np.asarray(y_pred, dtype=float)

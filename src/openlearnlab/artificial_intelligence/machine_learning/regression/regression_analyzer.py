@@ -4,6 +4,8 @@ import pandas as pd
 
 from ..base import BaseAnalyzer
 from .core import calculate_permutation_importance, plot_learning_curve
+from .core import compare_diagnostics as get_compare_diagnostics
+from .core import compare_feature_extraction as get_compare_feature_extraction
 from .core import compare_feature_sets as get_compare_feature_sets
 from .core import compare_models as get_compare_models
 from .core import (
@@ -39,14 +41,13 @@ class RegressionAnalyzer(BaseAnalyzer):
         features,
         target: str,
         models: dict,
-        random_state=RANDOM_STATE,
     ) -> Path:
         return get_compare_models(
             df=self.df,
             features=features,
             target=target,
             models=models,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "compare_models",
         )
@@ -56,16 +57,33 @@ class RegressionAnalyzer(BaseAnalyzer):
         features,
         target: str,
         model,
-        random_state: int = RANDOM_STATE,
+        model_name,
     ) -> Path:
         return get_diagnostics(
             df=self.df,
             features=features,
             target=target,
             model=model,
-            random_state=random_state,
+            model_name=model_name,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "diagnostics",
+        )
+
+    def compare_diagnostics(
+        self,
+        models: dict,
+        features,
+        target: str,
+    ) -> Path:
+        return get_compare_diagnostics(
+            df=self.df,
+            features=features,
+            target=target,
+            models=models,
+            dataset_name=self.dataset_name,
+            output=Path(self.output_dir) / "diagnostics/compare_diagnostics",
+            random_state=self.RANDOM_STATE,
         )
 
     def refine_and_compare(
@@ -73,14 +91,13 @@ class RegressionAnalyzer(BaseAnalyzer):
         features,
         target: str,
         model,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return get_refine_and_compare(
             df=self.df,
             features=features,
             target=target,
             model=model,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "refine_and_compare",
         )
@@ -90,14 +107,13 @@ class RegressionAnalyzer(BaseAnalyzer):
         features,
         target: str,
         model,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return get_evaluate_single_feature_removal(
             df=self.df,
             features=features,
             target=target,
             model=model,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "evaluate_single_feature_removal",
         )
@@ -108,7 +124,6 @@ class RegressionAnalyzer(BaseAnalyzer):
         candidates,
         target: str,
         model,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return get_evaluate_feature_removal_combinations(
             df=self.df,
@@ -116,7 +131,7 @@ class RegressionAnalyzer(BaseAnalyzer):
             candidates=candidates,
             target=target,
             model=model,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "evaluate_feature_removal_combinations",
         )
@@ -125,13 +140,12 @@ class RegressionAnalyzer(BaseAnalyzer):
         self,
         target: str,
         model=None,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return calculate_permutation_importance(
             df=self.df,
             target=target,
             model=model,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "permutation_importance",
         )
@@ -142,7 +156,6 @@ class RegressionAnalyzer(BaseAnalyzer):
         model,
         feature_sets: dict,
         cv: int = 5,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return get_compare_feature_sets(
             df=self.df,
@@ -150,7 +163,7 @@ class RegressionAnalyzer(BaseAnalyzer):
             model=model,
             feature_sets=feature_sets,
             cv=cv,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "compare_feature_sets",
         )
@@ -162,7 +175,6 @@ class RegressionAnalyzer(BaseAnalyzer):
         model=None,
         scoring: str = "r2",
         cv: int = 5,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return get_feature_selection(
             df=self.df,
@@ -171,7 +183,7 @@ class RegressionAnalyzer(BaseAnalyzer):
             model=model,
             scoring=scoring,
             cv=cv,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "feature_selection",
         )
@@ -179,7 +191,7 @@ class RegressionAnalyzer(BaseAnalyzer):
     def feature_extraction(
         self,
         target: str,
-        features=None,
+        features,
         variance_threshold: float = 0.95,
     ) -> Path:
         return get_feature_extraction(
@@ -191,15 +203,32 @@ class RegressionAnalyzer(BaseAnalyzer):
             output=self.output_dir / "feature_extraction",
         )
 
+    def compare_feature_extraction(
+        self,
+        models: dict,
+        target: str,
+        features,
+        variance_threshold: float = 0.95,
+    ) -> Path:
+        return get_compare_feature_extraction(
+            df=self.df,
+            features=features,
+            target=target,
+            models=models,
+            variance_threshold=variance_threshold,
+            dataset_name=self.dataset_name,
+            random_state=self.RANDOM_STATE,
+            output=self.output_dir / "compare_feature_extraction",
+        )
+
     def tune_model(
         self,
         target: str,
         model,
         param_grid: dict,
-        features=None,
+        features,
         cv: int = 5,
         scoring=None,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return get_tune_model(
             df=self.df,
@@ -209,7 +238,7 @@ class RegressionAnalyzer(BaseAnalyzer):
             features=features,
             cv=cv,
             scoring=scoring,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "tune_model",
         )
@@ -217,9 +246,8 @@ class RegressionAnalyzer(BaseAnalyzer):
     def learning_curve(
         self,
         target: str,
+        features,
         cv: int = 5,
-        random_state: int = RANDOM_STATE,
-        features=None,
         model=None,
         train_sizes=None,
     ) -> Path:
@@ -227,7 +255,7 @@ class RegressionAnalyzer(BaseAnalyzer):
             df=self.df,
             target=target,
             cv=cv,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             features=features,
             model=model,
             train_sizes=train_sizes,
@@ -238,10 +266,9 @@ class RegressionAnalyzer(BaseAnalyzer):
     def compare_regularization(
         self,
         target: str,
-        features=None,
+        features,
         alphas=None,
         l1_ratio: float = 0.5,
-        random_state: int = RANDOM_STATE,
     ) -> Path:
         return get_compare_regularization(
             df=self.df,
@@ -249,7 +276,7 @@ class RegressionAnalyzer(BaseAnalyzer):
             features=features,
             alphas=alphas,
             l1_ratio=l1_ratio,
-            random_state=random_state,
+            random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "compare_regularization",
         )
