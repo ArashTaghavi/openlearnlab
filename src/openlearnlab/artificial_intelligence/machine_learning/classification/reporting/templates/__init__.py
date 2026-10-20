@@ -1,3 +1,4 @@
+from .compare_class_weight_template import CompareClassWeightTemplate
 from .compare_models_template import CompareModelsTemplate
 from .diagnostics_template import DiagnosticsTemplate
 from .feature_extraction_comparison_template import FeatureExtractionComparisonTemplate
@@ -12,6 +13,7 @@ from .threshold_analysis_template import ThresholdAnalysisTemplate
 from .tune_model_template import TuneModelTemplate
 
 __all__ = [
+    "CompareClassWeightTemplate",
     "CompareModelsTemplate",
     "DiagnosticsTemplate",
     "FeatureExtractionComparisonTemplate",

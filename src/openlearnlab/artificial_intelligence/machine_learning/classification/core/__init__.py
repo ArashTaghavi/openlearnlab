@@ -1,4 +1,5 @@
 from .calculate_permutation_importance import calculate_permutation_importance
+from .compare_class_weight import compare_class_weight
 from .compare_feature_extraction import compare_feature_extraction
 from .compare_feature_sets import compare_feature_sets
 from .compare_models import compare_models
@@ -13,6 +14,7 @@ from .tune_model import tune_model
 
 __all__ = [
     "calculate_permutation_importance",
+    "compare_class_weight",
     "compare_feature_extraction",
     "compare_feature_sets",
     "compare_models",

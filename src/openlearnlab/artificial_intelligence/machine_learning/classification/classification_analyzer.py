@@ -4,6 +4,7 @@ import pandas as pd
 
 from ..base import BaseAnalyzer
 from .core import calculate_permutation_importance, plot_learning_curve
+from .core import compare_class_weight as get_compare_class_weight
 from .core import compare_feature_extraction as get_compare_feature_extraction
 from .core import compare_feature_sets as get_compare_feature_sets
 from .core import compare_models as get_compare_models
@@ -51,6 +52,24 @@ class ClassificationAnalyzer(BaseAnalyzer):
             random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "compare_models",
+        )
+
+    def compare_class_weight(
+        self,
+        model,
+        features: list,
+        target: str,
+        cv: int = 5,
+    ) -> Path:
+        return get_compare_class_weight(
+            df=self.df,
+            model=model,
+            features=features,
+            target=target,
+            dataset_name=self.dataset_name,
+            output=self.output_dir / "compare_class_weight",
+            cv=cv,
+            random_state=self.RANDOM_STATE,
         )
 
     def diagnostics(
