@@ -165,7 +165,7 @@ def compare_models(
 
     result = result.sort_values(
         by=[
-            "_Test F1 Mean",
+            "_Test Accuracy Mean",
             "_Test ROC AUC Mean",
             "_Predict Time Mean",
             "_Fit Time Mean",
