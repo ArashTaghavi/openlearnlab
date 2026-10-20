@@ -4,6 +4,7 @@ from typing import Literal
 import pandas as pd
 
 from .core import correlation as get_correlation
+from .core import feature_extraction as get_feature_extraction
 from .core import info as get_info
 
 
@@ -33,4 +34,19 @@ class BaseAnalyzer:
             method=method,
             dataset_name=self.dataset_name,
             output=self.output_dir / "correlation",
+        )
+
+    def feature_extraction(
+        self,
+        target: str,
+        features,
+        variance_threshold: float = 0.95,
+    ) -> Path:
+        return get_feature_extraction(
+            df=self.df,
+            target=target,
+            features=features,
+            variance_threshold=variance_threshold,
+            dataset_name=self.dataset_name,
+            output=self.output_dir / "feature_extraction",
         )

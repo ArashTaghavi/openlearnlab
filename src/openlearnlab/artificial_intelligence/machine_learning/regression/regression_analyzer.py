@@ -16,7 +16,6 @@ from .core import (
     evaluate_feature_removal_combinations as get_evaluate_feature_removal_combinations,
 )
 from .core import evaluate_single_feature_removal as get_evaluate_single_feature_removal
-from .core import feature_extraction as get_feature_extraction
 from .core import feature_selection as get_feature_selection
 from .core import refine_and_compare as get_refine_and_compare
 from .core import tune_model as get_tune_model
@@ -186,21 +185,6 @@ class RegressionAnalyzer(BaseAnalyzer):
             random_state=self.RANDOM_STATE,
             dataset_name=self.dataset_name,
             output=self.output_dir / "feature_selection",
-        )
-
-    def feature_extraction(
-        self,
-        target: str,
-        features,
-        variance_threshold: float = 0.95,
-    ) -> Path:
-        return get_feature_extraction(
-            df=self.df,
-            target=target,
-            features=features,
-            variance_threshold=variance_threshold,
-            dataset_name=self.dataset_name,
-            output=self.output_dir / "feature_extraction",
         )
 
     def compare_feature_extraction(

@@ -1,3 +1,4 @@
+from ...base.core.feature_extraction import feature_extraction
 from .calculate_permutation_importance import calculate_permutation_importance
 from .compare_diagnostics import compare_diagnostics
 from .compare_feature_extraction import compare_feature_extraction
@@ -7,7 +8,6 @@ from .compare_regularization import compare_regularization
 from .diagnostics import diagnostics
 from .evaluate_feature_removal_combinations import evaluate_feature_removal_combinations
 from .evaluate_single_feature_removal import evaluate_single_feature_removal
-from .feature_extraction import feature_extraction
 from .feature_selection import feature_selection
 from .plot_learning_curve import plot_learning_curve
 from .refine_and_compare import refine_and_compare
