@@ -13,6 +13,7 @@ from .core import diagnostics as get_diagnostics
 from .core import (
     label_correction_analysis as get_label_correction_analysis,
 )
+from .core import label_quality_analysis as get_label_quality_analysis
 from .core import similarity_analysis as get_similarity_analysis
 from .core import threshold_analysis as get_threshold_analysis
 
@@ -101,45 +102,27 @@ class ClassificationAnalyzer(BaseAnalyzer):
             average=average,
         )
 
-    def similarity_analysis(
+    def label_quality_analysis(
         self,
         features,
         target: str,
         model,
         model_name,
         n_neighbors: int = 10,
-    ) -> Path:
-        return get_similarity_analysis(
-            df=self.df,
-            features=features,
-            target=target,
-            model=model,
-            model_name=model_name,
-            dataset_name=self.dataset_name,
-            output=self.output_dir / "similarity_analysis",
-            random_state=self.RANDOM_STATE,
-            n_neighbors=n_neighbors,
-        )
-
-    def label_correction_analysis(
-        self,
-        features,
-        target: str,
-        model,
-        model_name,
-        n_neighbors: int = 10,
+        min_confidence: float = 90.0,
         min_disagreement: float = 80.0,
     ) -> Path:
-        return get_label_correction_analysis(
+        return get_label_quality_analysis(
             df=self.df,
             features=features,
             target=target,
             model=model,
             model_name=model_name,
             dataset_name=self.dataset_name,
-            output=self.output_dir / "label_correction_analysis",
+            output=self.output_dir / "label_quality_analysis",
             random_state=self.RANDOM_STATE,
             n_neighbors=n_neighbors,
+            min_confidence=min_confidence,
             min_disagreement=min_disagreement,
         )
 
