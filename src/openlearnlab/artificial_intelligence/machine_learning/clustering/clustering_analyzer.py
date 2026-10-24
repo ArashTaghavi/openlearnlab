@@ -4,6 +4,7 @@ import pandas as pd
 
 from ..base import BaseAnalyzer
 from .core import compare_models as get_compare_models
+from .core import visualize_data as get_visualize_data
 
 
 class ClusteringAnalyzer(BaseAnalyzer):
@@ -35,5 +36,23 @@ class ClusteringAnalyzer(BaseAnalyzer):
             output=self.output_dir / "compare_models",
             max_noise_ratio=max_noise_ratio,
             silhouette_sample_size=silhouette_sample_size,
+            random_state=self.RANDOM_STATE,
+        )
+
+    def visualize_data(
+        self,
+        features,
+        scale: bool = True,
+        sample_size: int | None = 1500,
+        color_by: str | None = None,
+    ) -> Path:
+        return get_visualize_data(
+            df=self.df,
+            features=features,
+            dataset_name=self.dataset_name,
+            output=self.output_dir / "visualize_data",
+            scale=scale,
+            sample_size=sample_size,
+            color_by=color_by,
             random_state=self.RANDOM_STATE,
         )
